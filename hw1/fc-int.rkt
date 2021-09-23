@@ -63,7 +63,9 @@
     ))
 
 ; runs interpreter for read instruction
-; @param
+; adds pairs (var, value) into fc-namespace
+; @param read-instr - read instruction
+; @param data - input
 (define (fc-run-read read-instr data)
   (match read-instr
     [`(fc-read ,h . ,t)
@@ -73,7 +75,7 @@
             )
           (zip (cons h t) data))
      ]
-    [_ (error "fc-int: incorrect read instruction")]
+    [_ (error (format "fc-int: incorrect read instruction ~a" read-instr))]
     ))
 
 
