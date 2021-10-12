@@ -1,7 +1,9 @@
 #lang racket
 
 (require "utils.rkt")
-(provide fc-int)
+(provide fc-int context-set fc-eval fc-ns)
+
+(define DEBUG true)
 
 ; the base block definition is slightly different from the definition in the task1.pdf
 ; basic block (bb) is a sequence of assignments*; jump-instruction
@@ -24,13 +26,18 @@
 
 (struct fc-return (e))
 
+(struct fc-print (e))
+
 ; runs interpreter for an assignment instruction
 ; @param assn - an assignmnet in Flow Chart
 (define (fc-run-assign assn)
   (
    match assn
     [`(fc-assign ,x ,e) (context-set x (fc-eval e))]
-    [_ (error (format "fc-int: assignment error ~a" assn))]
+    [`(fc-print ,e) (if DEBUG (println (format "**DEBUG** print ~a" (fc-eval e)))
+                        (error "print instruction supported only in DEBUG"))]
+    [_ (if DEBUG  (print (format "**DEBUG** error: assignment error ~a" assn))
+           (error (format "fc-int: assignment error ~a" assn)))]
     ))
 
 ; runs interpreter for a jump instruction
@@ -45,7 +52,8 @@
          (fc-run-bb (bb-by-label lbl2bb t) lbl2bb)
          (fc-run-bb (bb-by-label lbl2bb f) lbl2bb))]
     [`(fc-return ,e) (fc-eval e)]
-    [_ (error (format "fc-int: incorrect jump instruction ~a" jump))]
+    [_ (if DEBUG (print (format "**DEBUG** error: incorrect jump instruction ~a" jump))
+           (error (format "fc-int: incorrect jump instruction ~a" jump)))]
     )
   )
 
@@ -87,7 +95,8 @@
       (match bb
         [`(,lbl ,h . ,t) (set! lbl2bb (dict-set lbl2bb lbl (cons h t)))]
         [`(,lbl ,h) (set! lbl2bb (dict-set lbl2bb lbl h))]
-        [_ (error "fc-int: incorrect basic block")]
+        [_ (if DEBUG  (print (format "**DEBUG** error: incorrect basic block ~a" bb))
+               (error (format "fc-int: incorrect basic block: ~a" bb)))]
         ))
     lbl2bb
     )
