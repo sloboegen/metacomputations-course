@@ -3,27 +3,14 @@
 (require "fc-int.rkt")
 (provide tm-int)
 
-; saved just for debug
-; (define tm-inst-by-label
-;   '((fc-read Q lbl)
+; returns tails of pgm starting from lbl
+(define (tm-tail-by-label lbl pgm)
+  (match pgm
+    ['() (error (format "tm-int: no such label ~a" lbl))]
+    [`(,h . ,t) (if (equal? (car h) lbl) (cons h t) (tm-tail-by-label lbl t))]))
 
-;     (init (fc-assign Qtail Q)
-;           (fc-goto loop))
+(eval (context-set 'tm-tail-by-label tm-tail-by-label) fc-ns)
 
-;     (loop (fc-if (equal? Qtail '()) err iter))
-
-;     (iter (fc-assign Label (caar Qtail))
-;           (fc-assign Command (cdar Qtail))
-;           (fc-assign Qtail (cdr Qtail))
-;           (fc-if (equal? Label lbl) found loop))
-
-;     (err (fc-return "tm-int: unknown label"))
-;     (found (fc-return (cons (cons Label Command) Qtail)))
-;     )
-;   )
-
-; implementation is based on the book
-; "Partial Evaluation and Automatic Program Generation" (Jones, Gomard, Sestoft), page 74
 (define tm-int
   '((fc-read Q Right)
 
@@ -58,29 +45,17 @@
               (fc-goto loop))
 
     (dogoto   (fc-assign Nextlabel (caddr Instruction))
-              (fc-goto gotoinit))
+              (fc-assign Qtail (tm-tail-by-label Nextlabel Q))
+              (fc-goto loop))
 
     (doif     (fc-assign Symbol (caddr Instruction))
               (fc-assign Nextlabel (car (cddddr Instruction)))
-              (fc-if (equal? Symbol (car Right)) gotoinit loop))
+              (fc-if (equal? Symbol (car Right)) jump loop))
+
+    (jump     (fc-assign Qtail (tm-tail-by-label Nextlabel Q))
+              (fc-goto loop))
 
     (stop (fc-return Right))
-
-    ; utils for goto
-    ; BEGIN get program-tail by label
-    (gotoinit (fc-assign UQtail Q)
-              (fc-goto uloop))
-
-    (uloop (fc-if (equal? UQtail '()) errlbl uiter))
-
-    (uiter (fc-assign ULabel (caar UQtail))
-           (fc-assign UCommand (cdar UQtail))
-           (fc-assign UQtail (cdr UQtail))
-           (fc-if (equal? ULabel Nextlabel) ufound uloop))
-
-    (ufound (fc-assign Qtail (cons (cons ULabel UCommand) UQtail))
-            (fc-goto loop))
-    ; END get program-tail by label
 
     (errlbl (fc-return "tm-int: unknown label"))
     (errinst (fc-return "tm-int: unknown instruction"))
