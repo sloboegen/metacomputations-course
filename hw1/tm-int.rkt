@@ -57,7 +57,7 @@
 
     (stop (fc-return Right))
 
-    (errlbl (fc-return "tm-int: unknown label"))
+    (errlbl  (fc-return "tm-int: unknown label"))
     (errinst (fc-return "tm-int: unknown instruction"))
     )
   )
