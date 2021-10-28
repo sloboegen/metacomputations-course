@@ -358,7 +358,6 @@
                   (fc-assign pp2vs-s   (cons pp2-s vs-s))
                   (fc-assign npend-s   (list-subtract (list pp1vs-s pp2vs-s) marked-s))
                   (fc-assign pending-s (append pending-s npend-s))
-                  ; (fc-assign label-s   (cons pp-s vs-s))
                   (fc-assign instr-s   (list `(fc-if ,(fc-reduce expr-s vs-s) ,pp1vs-s ,pp2vs-s)))
                   (fc-assign code-s    (append code-s instr-s))
                   (fc-goto in-loop-s))
@@ -371,7 +370,6 @@
     ; RETURN: return expr
     (do-return-s (fc-assign expr-s    (cadr command-s)) ; cdr returns an expression wrapped into a list
                  (fc-assign reduced-s (fc-reduce expr-s vs-s))
-                 ;  (fc-assign label-s   (cons pp-s vs-s))
                  (fc-assign instr-s   (list `(fc-return ,reduced-s)))
                  (fc-assign code-s    (append code-s instr-s))
                  (fc-goto in-loop-s))
@@ -399,11 +397,10 @@
 
     (main-loop (fc-if (equal? pending '()) stop iter))
 
-    (iter (fc-assign ppvs    (car pending))
-          (fc-assign pp      (car ppvs))
+    (iter (fc-assign pp      (car ppvs))
           (fc-assign vs      (cdr ppvs))
           (fc-assign pending (cdr pending))
-          (fc-assign marked  (append marked (list ppvs)))
+          (fc-assign marked  (append marked (list (cons pp vs))))
           (fc-goto trick-begin))
 
     (in-loop (fc-if (equal? bb '()) upd-residual case-cmd))
@@ -419,73 +416,49 @@
     (if-print  (fc-if (equal? (car command) 'fc-print)  do-print  errlbl))
 
     ; BEGIN CASE
-
-    (do-print (fc-assign debug command)
+    (do-print 
+            ; (fc-assign debug command)
               (fc-goto in-loop))
 
     ; ASSIGN: varname := expr
-    (do-assign (fc-assign varname (cadr command))
-               (fc-assign expr    (caddr command))
-               (fc-if (equal? (dict-ref division varname) "static") do-assign-st do-assign-dy))
+    (do-assign (fc-if (equal? (dict-ref division (cadr command)) "static") do-assign-st do-assign-dy))
 
     ; static-ASSIGN
-    (do-assign-st (fc-assign vs (dict-set vs varname (fc-eval-with-state expr vs)))
+    (do-assign-st (fc-assign vs (dict-set vs (cadr command) (fc-eval-with-state (caddr command) vs)))
                   (fc-goto in-loop))
 
     ; dynamic-ASSIGN
-    (do-assign-dy (fc-assign instr (list `(fc-assign ,varname ,(fc-reduce expr vs))))
-                  (fc-assign code  (append code instr))
+    (do-assign-dy (fc-assign code  (append code (list `(fc-assign ,(cadr command) ,(fc-reduce (caddr command) vs)))))
                   (fc-goto in-loop))
 
     ; IF: if expr then goto pp' else goto pp''
-    (do-if (fc-assign expr (cadr command))
-           (fc-if (equal? (fc-expr-static? expr division) #t) do-if-st do-if-dy))
+    (do-if (fc-if (equal? (fc-expr-static? (cadr command) division) #t) do-if-st do-if-dy))
 
     ; static-IF
-    (do-if-st (fc-assign st-cond (fc-eval-with-state expr vs))
-              (fc-if (equal? st-cond #t) do-if-st-t do-if-st-f))
+    (do-if-st (fc-if (equal? (fc-eval-with-state expr vs) #t) do-if-st-t do-if-st-f))
 
     ; static-IF-true
-    (do-if-st-t (fc-assign pp1 (caddr command))
-                (fc-assign bb (lookup-bb pp1 (cdr program)))
+    (do-if-st-t (fc-assign bb (lookup-bb (caddr command) (cdr program)))
                 (fc-goto in-loop))
 
     ; static-IF-false
-    (do-if-st-f (fc-assign pp1 (cadddr command))
-                (fc-assign bb (lookup-bb pp1 (cdr program)))
+    (do-if-st-f 
+                (fc-assign bb (lookup-bb (cadddr command) (cdr program)))
                 (fc-goto in-loop))
 
     ; dynamic-IF
-    (do-if-dy   (fc-assign pp1     (caddr command))
-                (fc-assign pp2     (cadddr command))
-                (fc-assign pp1vs   (cons pp1 vs))
-                (fc-assign pp2vs   (cons pp2 vs))
-                (fc-assign npend   (list-subtract (list pp1vs pp2vs) marked))
-                (fc-assign pending (append pending npend))
-                (fc-assign label   (cons pp-static vs))
-                (fc-assign instr   (list `(fc-if ,(fc-reduce expr vs) ,pp1vs ,pp2vs)))
-                (fc-assign code    (append code instr))
+    (do-if-dy   (fc-assign pending (append pending (list-subtract (list (cons (caddr command) vs) (cons (cadddr command) vs)) marked)))
+                (fc-assign code (append code (list `(fc-if ,(fc-reduce expr vs)
+                                                            ,(cons (caddr command) vs)
+                                                            ,(cons (cadddr command) vs)))))
                 (fc-goto in-loop))
 
-    ; (do-if-dy     (fc-assign pp1     (caddr command))
-    ;               (fc-assign pp2     (cadddr command))
-    ;               (fc-assign pending (append pending (list-subtract (list (cons (caddr command) vs) (cons (cadddr command) vs)) marked)))
-    ;               (fc-assign code (append code (list `(fc-if ,(fc-reduce expr vs)
-    ;                                                           ,(cons (caddr command) vs)
-    ;                                                           ,(cons (cadddr command) vs)))))
-    ;               (fc-goto in-loop)
-    ;               )
-
     ; GOTO: goto pp'
-    (do-goto (fc-assign pp1 (cadr command))
-             (fc-assign bb (lookup-bb pp1 (cdr program)))
+    (do-goto (fc-assign bb (lookup-bb (cadr command) (cdr program)))
              (fc-goto in-loop))
 
     ; RETURN: return expr
-    (do-return (fc-assign expr    (cadr command)) ; cdr returns an expression wrapped into a list
-               (fc-assign label   (cons pp-static vs))
-               (fc-assign instr   (list `(fc-return ,(fc-reduce expr vs))))
-               (fc-assign code    (append code instr))
+    (do-return (fc-assign code    (append code (list `(fc-return ,(fc-reduce (cadr command) vs)))))
                (fc-goto in-loop))
 
     ; END CASE
@@ -523,7 +496,6 @@
                               (pending   . "dynamic")
                               (marked    . "dynamic")
                               (residual  . "dynamic")
-                              (ppvs      . "dynamic")
                               (pp        . "dynamic")
                               (vs        . "dynamic")
                               (pgm-rest  . "static")
@@ -531,18 +503,7 @@
                               (cur-bb    . "static")
                               (bb        . "static")
                               (code      . "dynamic")
-                              (command   . "static")
-                              (varname   . "static")
-                              (expr      . "static")
-                              (instr     . "dynamic")
-                              (st-cond   . "dynamic")
-                              (pp1       . "static")
-                              (pp2       . "static")
-                              (pp1vs     . "dynamic")
-                              (pp2vs     . "dynamic")
-                              (npend     . "dynamic")
-                              (label     . "dynamic")
-                              )
+                              (command   . "static"))
   )
 
 (define fc-mix-vs `#hash((program  . ,tm-int)
