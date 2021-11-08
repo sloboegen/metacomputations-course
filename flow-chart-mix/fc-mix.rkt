@@ -1,7 +1,7 @@
 #lang racket
 
-(require "../hw1/fc-int.rkt")
-(require "../hw1/tm-int.rkt")
+(require "fc-int.rkt")
+(require "tm-int.rkt")
 
 (provide fc-mix)
 (provide fc-mix-mix-pp)
