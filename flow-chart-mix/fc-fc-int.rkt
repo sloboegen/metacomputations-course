@@ -2,6 +2,8 @@
 
 (require "fc-int.rkt")
 
+(provide fc-fc-int)
+
 ; returns basic block by label
 ; @param pp - a label
 ; @param pgm - a program without read instruction

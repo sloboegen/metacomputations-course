@@ -1,10 +1,9 @@
 #lang racket
 
 (require "fc-int.rkt")
-(require "tm-int.rkt")
 
 (provide fc-mix)
-(provide fc-mix-mix-pp)
+(provide fc-mix-outer fc-mix-trick pretty-labels-program)
 
 
 (define (fc-reduce expr static-state)
@@ -59,6 +58,7 @@
 (eval (context-set 'filter-read        filter-read) fc-ns)
 (eval (context-set 'lookup-bb          lookup-bb) fc-ns)
 
+; Simple mix 
 ; @param program  - a program on FC, a quoted value
 ; @param division - a hash [variable -> {static, dynamic}]
 ; @param vs0      - values of the static input
@@ -195,82 +195,6 @@
     [`(,h . ,t) (append (list h) (pretty-labels-bb t lbl2num))] ; don't modify assign
 
     ))
-
-
-; TESTS
-; Basics
-(define simple-program
-  '((fc-read x)
-    (fake   (fc-assign x 1)
-            (fc-goto fake2))
-    (fake2  (fc-goto result))
-    (result (fc-assign y 42)
-            (fc-return (+ x y)))
-    ))
-
-(define if-program-st
-  '((fc-read x)
-    (con (fc-assign y 1)
-         (fc-if (equal? y 1) ok err))
-    (ok  (fc-return y))
-    (err (fc-return -1))
-    ))
-
-(define if-program-dy
-  '((fc-read x)
-    (con (fc-assign x 1)
-         (fc-if (equal? x 1) ok err))
-
-    (ok  (fc-return 42))
-    (err (fc-return -1))
-    ))
-
-(define if-program-dy-division #hash((y . "static") (x . "dynamic")))
-(define if-program-dy-vs #hash((y . 0)))
-(define (if-program-dy-mix) (fc-int fc-mix `(,if-program-dy ,if-program-dy-division ,if-program-dy-vs)))
-(define (if-program-dy-mix-pp) (pretty-labels-program (if-program-dy-mix)))
-
-; Find-name
-(define find-name
-  '((fc-read name namelist valuelist)
-    (search (fc-if (equal? name (car namelist)) found cont))
-    (cont (fc-assign valuelist (cdr valuelist))
-          (fc-assign namelist (cdr namelist))
-          (fc-goto search))
-    (found (fc-return (car valuelist)))
-    ))
-
-
-(define find-name-division #hash((name . "static") (namelist . "static") (valuelist . "dynamic")))
-(define find-name-vs  #hash((name . z) (namelist . (x y z))))
-
-(define (find-name-mix) (fc-int fc-mix `(,find-name ,find-name-division ,find-name-vs)))
-
-(define (find-name-mix-pp) (pretty-labels-program (find-name-mix)))
-
-(define tm-example
-  '((0 tm-if 0 tm-goto 3)
-    (1 tm-right)
-    (2 tm-goto 0)
-    (3 tm-write 1))
-  )
-
-; Turing Machine
-(define tm-int-division #hash((Q           . "static")
-                              (Qtail       . "static")
-                              (Instruction . "static")
-                              (Operator    . "static")
-                              (Symbol      . "static")
-                              (Nextlabel   . "static")
-                              (Left        . "dynamic")
-                              (Right       . "dynamic")))
-
-(define tm-int-vs `#hash((Q     . ,tm-example)))
-
-(define (tm-int-example-mix) (fc-int fc-mix `(,tm-int ,tm-int-division ,tm-int-vs)))
-
-(define (tm-int-example-mix-pp) (pretty-labels-program (tm-int-example-mix)))
-
 
 ;===============FC-MIX WITH THE TRICK===============================================
 
@@ -499,36 +423,3 @@
     (errlbl (fc-return (format "fc-mix: unknown label")))
     )
   )
-
-(define fc-mix-division #hash((program   . "static")
-                              (division  . "static")
-                              (vs0       . "dynamic")
-                              (pp0       . "static")
-                              (pending   . "dynamic")
-                              (marked    . "dynamic")
-                              (residual  . "dynamic")
-                              (pp        . "dynamic")
-                              (vs        . "dynamic")
-                              (labels    . "static")
-                              (pp-static . "static")
-                              (bb        . "static")
-                              (code      . "dynamic")
-                              (command   . "static"))
-  )
-
-(define fc-mix-vs `#hash((program  . ,tm-int)
-                         (division . ,tm-int-division))
-  )
-
-(define (fc-mix-mix) (fc-int fc-mix-outer `(,fc-mix-trick ,fc-mix-division ,fc-mix-vs)))
-
-(define (fc-mix-mix-pp) (pretty-labels-program (fc-mix-mix)))
-
-(define (fc-mix-mix-tm-example-vs) `#hash((vs0 . ,tm-int-vs)))
-
-; (define (test-generate-compiler-TM)
-;   (fc-int generated-compiler-TM `(,tm-int-vs)))
-
-(define (tm-int-example-mix-2) (fc-int fc-mix-trick `(,tm-int ,tm-int-division ,tm-int-vs)))
-
-; (define (tm-int-example-mix-pp-2) (pretty-labels-program (tm-int-example-mix)))
