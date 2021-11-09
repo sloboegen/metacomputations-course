@@ -10,7 +10,7 @@
 (define (fc-reduce expr static-state)
   (match expr
     [`(,h . ,t) (cons (fc-reduce h static-state) (fc-reduce t static-state))]
-    [`,v (if (dict-has-key? static-state v) (dict-ref static-state v) v)]
+    [`,v (if (dict-has-key? static-state v) `',(dict-ref static-state v) v)]
     ))
 
 (define (fc-expr-static? expr division)
@@ -189,7 +189,7 @@
   (match bb
     [`(,h)  (match h
               [`(fc-goto ,lbl)   (list `(fc-goto ,(dict-ref lbl2num lbl)))]
-              [`(fc-if ,c ,t ,f) (list `(fc-if c ,(dict-ref lbl2num t) ,(dict-ref lbl2num f)))]
+              [`(fc-if ,c ,t ,f) (list `(fc-if ,c ,(dict-ref lbl2num t) ,(dict-ref lbl2num f)))]
               [other             (list other)]) ; other instructions doesn't contain labels
             ]
     [`(,h . ,t) (append (list h) (pretty-labels-bb t lbl2num))] ; don't modify assign
@@ -265,8 +265,7 @@
                               (Left        . "dynamic")
                               (Right       . "dynamic")))
 
-(define tm-int-vs `#hash((Q     . ,tm-example)
-                         (Right . (1 1 1 0 1 0 1))))
+(define tm-int-vs `#hash((Q     . ,tm-example)))
 
 (define (tm-int-example-mix) (fc-int fc-mix `(,tm-int ,tm-int-division ,tm-int-vs)))
 
@@ -285,7 +284,7 @@
              (when (not (fc-expr-static? (cadr instr) division))
                (set! lbls-dy (append lbls-dy (list (caddr instr) (cadddr instr)))))))])
       )
-      (set->list (list->set lbls-dy))
+    (set->list (list->set lbls-dy))
     )
   )
 
@@ -337,15 +336,11 @@
 
     ; static-ASSIGN
     (do-assign-st-s
-     ; (fc-print "static assn: ")
-     ; (fc-print `(,varname-s ,expr-s))
      (fc-assign vs-s (dict-set vs-s varname-s (fc-eval-with-state expr-s vs-s)))
      (fc-goto in-loop-s))
 
     ; dynamic-ASSIGN
     (do-assign-dy-s
-     ; (fc-print "dynamic assn: ")
-     ; (fc-print `(,varname-s ,expr-s))
      (fc-assign instr-s (list `(fc-assign ,varname-s ,(fc-reduce expr-s vs-s))))
      (fc-assign code-s  (append code-s instr-s))
      (fc-goto in-loop-s))
@@ -414,8 +409,8 @@
 
     (main-loop (fc-if (equal? pending '()) stop iter))
 
-    (iter (fc-assign pp      (car ppvs))
-          (fc-assign vs      (cdr ppvs))
+    (iter (fc-assign pp      (caar pending))
+          (fc-assign vs      (cdar pending))
           (fc-assign pending (cdr pending))
           (fc-assign marked  (append marked (list (cons pp vs))))
           (fc-goto trick-begin))
@@ -433,9 +428,9 @@
     (if-print  (fc-if (equal? (car command) 'fc-print)  do-print  errlbl))
 
     ; BEGIN CASE
-    (do-print
-     ; (fc-assign debug command)
-     (fc-goto in-loop))
+
+    (do-print (fc-assign debug command)
+              (fc-goto in-loop))
 
     ; ASSIGN: varname := expr
     (do-assign (fc-if (equal? (dict-ref division (cadr command)) "static") do-assign-st do-assign-dy))
@@ -452,7 +447,7 @@
     (do-if (fc-if (equal? (fc-expr-static? (cadr command) division) #t) do-if-st do-if-dy))
 
     ; static-IF
-    (do-if-st (fc-if (equal? (fc-eval-with-state expr vs) #t) do-if-st-t do-if-st-f))
+    (do-if-st (fc-if (equal? (fc-eval-with-state (cadr command) vs) #t) do-if-st-t do-if-st-f))
 
     ; static-IF-true
     (do-if-st-t (fc-assign bb (lookup-bb (caddr command) (cdr program)))
@@ -463,11 +458,12 @@
                 (fc-goto in-loop))
 
     ; dynamic-IF
-    (do-if-dy   (fc-assign pending (append pending (list-subtract (list (cons (caddr command) vs) (cons (cadddr command) vs)) marked)))
-                (fc-assign code (append code (list `(fc-if ,(fc-reduce expr vs)
-                                                           ,(cons (caddr command) vs)
-                                                           ,(cons (cadddr command) vs)))))
-                (fc-goto in-loop))
+    (do-if-dy (fc-assign pending (append pending (list-subtract (list (cons (caddr command) vs) (cons (cadddr command) vs)) marked)))
+              (fc-assign code    (append code
+                                         (list `(fc-if ,(fc-reduce (cadr command) vs)
+                                                       ,(cons (caddr command) vs)
+                                                       ,(cons (cadddr command) vs)))))
+              (fc-goto in-loop))
 
     ; GOTO: goto pp'
     (do-goto (fc-assign bb (lookup-bb (cadr command) (cdr program)))
@@ -485,7 +481,7 @@
 
     ; THE TRICK
     ; pp-dynamic is pp
-    (trick-begin (fc-assign labels (get-dynamic-labels program division))
+    (trick-begin (fc-assign labels (append (list 'init) (get-dynamic-labels program division)))
                  (fc-goto trick-cycle))
 
     (trick-cycle (fc-if (equal? labels '()) trick-error-label trick-iter))
@@ -498,9 +494,9 @@
                     (fc-assign code (list (cons pp-static vs)))
                     (fc-goto in-loop))
 
-    (trick-error-label (fc-return (format "trick in fc-mix: unknown label ~a" ,pp)))
+    (trick-error-label (fc-return (format "trick in fc-mix: unknown label")))
 
-    (errlbl (fc-return (format "fc-mix: unknown label ~a" ,pp)))
+    (errlbl (fc-return (format "fc-mix: unknown label")))
     )
   )
 
@@ -528,4 +524,11 @@
 
 (define (fc-mix-mix-pp) (pretty-labels-program (fc-mix-mix)))
 
-(define fc-mix-mix-tm-example-vs `#hash((vs0 . ,tm-int-vs)))
+(define (fc-mix-mix-tm-example-vs) `#hash((vs0 . ,tm-int-vs)))
+
+; (define (test-generate-compiler-TM)
+;   (fc-int generated-compiler-TM `(,tm-int-vs)))
+
+(define (tm-int-example-mix-2) (fc-int fc-mix-trick `(,tm-int ,tm-int-division ,tm-int-vs)))
+
+; (define (tm-int-example-mix-pp-2) (pretty-labels-program (tm-int-example-mix)))
