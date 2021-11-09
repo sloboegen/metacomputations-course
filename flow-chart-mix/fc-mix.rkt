@@ -401,7 +401,7 @@
 
     ; THE TRICK
     ; pp-dynamic is pp
-    (trick-begin (fc-assign labels (append (list 'init) (get-dynamic-labels program division)))
+    (trick-begin (fc-assign labels (append (list pp0) (get-dynamic-labels program division)))
                  (fc-goto trick-cycle))
 
     (trick-cycle (fc-if (equal? labels '()) trick-error-label trick-iter))
