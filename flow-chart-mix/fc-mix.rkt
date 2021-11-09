@@ -348,13 +348,9 @@
     (if-assign (fc-if (equal? (car command) 'fc-assign) do-assign if-return))
     (if-return (fc-if (equal? (car command) 'fc-return) do-return if-goto))
     (if-goto   (fc-if (equal? (car command) 'fc-goto)   do-goto   if-if))
-    (if-if     (fc-if (equal? (car command) 'fc-if)     do-if     if-print))
-    (if-print  (fc-if (equal? (car command) 'fc-print)  do-print  errlbl))
+    (if-if     (fc-if (equal? (car command) 'fc-if)     do-if     errlbl))
 
     ; BEGIN CASE
-
-    (do-print (fc-assign debug command)
-              (fc-goto in-loop))
 
     ; ASSIGN: varname := expr
     (do-assign (fc-if (equal? (dict-ref division (cadr command)) "static") do-assign-st do-assign-dy))

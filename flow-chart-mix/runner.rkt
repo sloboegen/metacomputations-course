@@ -6,7 +6,7 @@
 (require "tm-int.rkt")
 
 
-; ====PROGRAM WITH DIVISIONS====
+; ====PROGRAMS WITH DIVISIONS====
 
 ; Find-name
 (define find-name
@@ -96,12 +96,10 @@
 
 
 ; 2. FlowChart-interpreter
-(define fc-fc-int-division #hash((program  . "static")
+(define fc-fc-int-division #hash((pgm-fc   . "static")
                                  (data     . "dynamic")
-                                 (vrbs     . "static")
+                                 (vrbs     . "dynamic")
                                  (vals     . "dynamic")
-                                 (rdvrbs   . "static")
-                                 (rddata   . "dynamic")
                                  (inst     . "static")
                                  (bb-rest  . "static")
                                  (var      . "static")
@@ -113,13 +111,15 @@
   )
 
 (define fc-mix-vs-fc-int `#hash((program  . ,fc-fc-int)
-                                   (division . ,fc-fc-int-division))
-                                   )
+                                (division . ,fc-fc-int-division))
+  )
 
 (define (fc-mix-mix-fc) (fc-int fc-mix-outer `(,fc-mix-trick ,fc-mix-division ,fc-mix-vs-fc-int)))
 
 (define (fc-mix-mix-fc-pp) (pretty-labels-program (fc-mix-mix-fc)))
 
-(define fc-int-vs `#hash((program . ,find-name)))
+(define fc-int-vs `#hash((pgm-fc . ,find-name)))
 
 (define (test-generate-compiler-fc) (fc-int (fc-mix-mix-fc-pp) `(,fc-int-vs)))
+
+(define (test-fc-compiler-test-pp) (pretty-labels-program (test-generate-compiler-fc)))

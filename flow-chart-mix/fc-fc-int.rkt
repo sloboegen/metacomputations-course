@@ -15,7 +15,7 @@
                   [`(,lbl ,_ . ,_) (if (equal? lbl pp) (cdr h) (lookup-bb pp t))])])
   )
 
-(define (fc-eval-with-state expr vrbs vals)
+(define (fc-eval-with-vars-vals expr vrbs vals)
   (for ([vrb vrbs]
         [val vals])
     (context-set vrb val))
@@ -32,26 +32,24 @@
       (let ([i (index-of vrbs x)]) (cons vrbs (list-set vals i e)))
       ))
 
-(eval (context-set 'do-assign-vrbval   do-assign-vrbval)   fc-ns)
-(eval (context-set 'fc-eval-with-state fc-eval-with-state) fc-ns)
-(eval (context-set 'lookup-bb          lookup-bb)          fc-ns)
+(eval (context-set 'do-assign-vrbval       do-assign-vrbval)       fc-ns)
+(eval (context-set 'fc-eval-with-vars-vals fc-eval-with-vars-vals) fc-ns)
+(eval (context-set 'lookup-bb              lookup-bb)              fc-ns)
 
 ; Flow Chart interpreter written on Flow Chart
 (define fc-fc-int
-  '((fc-read program data)
-    (init    (fc-assign vrbs '())
+  '((fc-read pgm-fc data)
+
+    ; hardcode all input variables
+    (init    (fc-assign vrbs '(name namelist valuelist))
              (fc-assign vals '())
-             (fc-assign rdvrbs (cdar program))
-             (fc-assign rddata data)
              (fc-goto   do-read))
 
-    (do-read (fc-assign vrbs (append vrbs (list (car rdvrbs))))
-             (fc-assign vals (append vals (list (car rddata))))
-             (fc-assign rdvrbs (cdr rdvrbs))
-             (fc-assign rddata (cdr rddata))
-             (fc-if (equal? rddata '()) loop-bbs do-read))
+    (do-read (fc-assign vals (append vals (list (car data))))
+             (fc-assign data (cdr data))
+             (fc-if (equal? data '()) loop-bbs do-read))
 
-    (loop-bbs (fc-assign bb-rest (cdadr program))
+    (loop-bbs (fc-assign bb-rest (cdadr pgm-fc))
               (fc-goto loop-bb))
 
     (loop-bb (fc-assign inst (car bb-rest))
@@ -60,7 +58,7 @@
 
     (do-assn (fc-assign var (cadr inst))
              (fc-assign expr (caddr inst))
-             (fc-assign vrbsvals (do-assign-vrbval var (fc-eval-with-state expr vrbs vals) vrbs vals))
+             (fc-assign vrbsvals (do-assign-vrbval var (fc-eval-with-vars-vals expr vrbs vals) vrbs vals))
              (fc-assign vrbs (car vrbsvals))
              (fc-assign vals (cdr vrbsvals))
              (fc-goto loop-bb))
@@ -70,20 +68,20 @@
     (if-return (fc-if (equal? (car inst) 'fc-return) do-return error-inst))
 
     (do-goto   (fc-assign lbl (cadr inst))
-               (fc-assign bb-rest (lookup-bb lbl program))
+               (fc-assign bb-rest (lookup-bb lbl pgm-fc))
                (fc-goto loop-bb))
 
     (do-if     (fc-assign lbl-t (caddr inst))
                (fc-assign lbl-f (cadddr inst))
-               (fc-if (fc-eval-with-state (cadr inst) vrbs vals) do-if-t do-if-f))
+               (fc-if (fc-eval-with-vars-vals (cadr inst) vrbs vals) do-if-t do-if-f))
 
-    (do-if-t   (fc-assign bb-rest (lookup-bb lbl-t program))
+    (do-if-t   (fc-assign bb-rest (lookup-bb lbl-t pgm-fc))
                (fc-goto loop-bb))
 
-    (do-if-f   (fc-assign bb-rest (lookup-bb lbl-f program))
+    (do-if-f   (fc-assign bb-rest (lookup-bb lbl-f pgm-fc))
                (fc-goto loop-bb))
 
-    (do-return (fc-return (fc-eval-with-state (cadr inst) vrbs vals)))
+    (do-return (fc-return (fc-eval-with-vars-vals (cadr inst) vrbs vals)))
 
     (error-inst (fc-return "error instruction"))
     ))
@@ -114,5 +112,3 @@
     ))
 
 (define (fc-fc-int-findname-test) (fc-int fc-fc-int `(,find-name (y (x y z) (1 2 3)))))
-
-(define (fc-fc-int-mix-test) (fc-int) )
