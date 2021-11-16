@@ -173,8 +173,7 @@
       (set! lbl2num (dict-set lbl2num (car lbl-inst) num))
       (set! num (+ num 1))
       )
-    (println "COUNT OF STATES")
-    (println (- num 1))
+    (printf "*** DEBUG: COUNT OF STATES ~a\n" (- num 1))
     lbl2num
     )
   )
