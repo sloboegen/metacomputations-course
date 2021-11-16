@@ -3,7 +3,7 @@
 (require "fc-int.rkt")
 
 (provide fc-mix)
-(provide fc-mix-outer fc-mix-trick pretty-labels-program)
+(provide fc-mix-outer fc-mix-trick fc-mix-inner-inner pretty-labels-program)
 
 
 (define (fc-reduce expr static-state)
@@ -58,7 +58,11 @@
 (eval (context-set 'filter-read        filter-read) fc-ns)
 (eval (context-set 'lookup-bb          lookup-bb) fc-ns)
 
-; Simple mix 
+
+; =======================================================================
+; ======================== SIMPLE MIX (FOR I PROJECTION) ================
+; =======================================================================
+
 ; @param program  - a program on FC, a quoted value
 ; @param division - a hash [variable -> {static, dynamic}]
 ; @param vs0      - values of the static input
@@ -196,7 +200,12 @@
 
     ))
 
-;===============FC-MIX WITH THE TRICK===============================================
+
+; =======================================================================
+; ========================  MIXES FOR II PORJECTION  ====================
+; ========================  (WITH TRICK AND WITHOUT) ====================
+; =======================================================================
+
 
 (define (get-dynamic-labels pgm division)
   (let ([lbls-dy '()])
@@ -214,6 +223,7 @@
 
 (eval (context-set 'get-dynamic-labels get-dynamic-labels) fc-ns)
 
+; ------------------------ 1. Simple mix but with renamed variables -----
 
 (define fc-mix-outer
   '((fc-read program-s division-s vs0-s)
@@ -320,8 +330,9 @@
     )
   )
 
-; MIX WITH THE TRICK
-; inner mix
+
+; ------------------------ 2. Mix with the trick (inner mix) ------------
+
 (define fc-mix-trick
   '((fc-read program division vs0)
 
@@ -417,5 +428,216 @@
     (trick-error-label (fc-return (format "trick in fc-mix: unknown label")))
 
     (errlbl (fc-return (format "fc-mix: unknown label")))
+    )
+  )
+
+
+
+; =======================================================================
+; ========================  MIX FOR III PORJECTION  =====================
+; =======================================================================
+
+; mix for 3 Futamura projection
+; @param program-i  - a program on FC, a quoted value
+; @param division-i - a hash [variable -> {static, dynamic}]
+; @param vs0-i      - values of the static input
+; (define fc-mix-inner-inner
+;   '((fc-read program-i division-i vs0-i)
+
+;     (init-i (fc-assign pp0-i      (caadr program-i))
+;             (fc-assign pending-i  (list (cons pp0-i vs0-i)))
+;             (fc-assign marked-i  '())
+;             (fc-assign residual-i (list (filter-read (car program-i) division-i))) ; read instruction
+;             (fc-goto main-loop-i))
+
+;     (main-loop-i (fc-if (equal? pending-i '()) stop-i iter-i))
+
+;     (iter-i (fc-assign ppvs-i    (car pending-i))
+;             (fc-assign pp-i      (car ppvs-i))
+;             (fc-assign vs-i      (cdr ppvs-i))
+;             (fc-assign pending-i (cdr pending-i))
+;             (fc-assign marked-i  (append marked-i (list ppvs-i)))
+;             (fc-assign code-i    (list (cons pp-i vs-i)))
+;             (fc-assign bb-i      (lookup-bb pp-i (cdr program-i)))
+;             (fc-goto in-loop-i))
+
+;     (in-loop-i (fc-if (equal? bb-i '()) upd-residual-i case-cmd-i))
+
+;     (case-cmd-i (fc-assign command-i (car bb-i))
+;                 (fc-assign bb-i (cdr bb-i))
+;                 (fc-goto if-assign-i))
+
+;     (if-assign-i (fc-if (equal? (car command-i) 'fc-assign) do-assign-i if-return-i))
+;     (if-return-i (fc-if (equal? (car command-i) 'fc-return) do-return-i if-goto-i))
+;     (if-goto-i   (fc-if (equal? (car command-i) 'fc-goto)   do-goto-i   if-if-i))
+;     (if-if-i     (fc-if (equal? (car command-i) 'fc-if)     do-if-i     errlbl-i))
+
+;     ; BEGIN CASE
+
+;     ; ASSIGN: varname := expr
+;     (do-assign-i (fc-assign varname-i (cadr command-i))
+;                  (fc-assign expr-i    (caddr command-i))
+;                  (fc-if (equal? (dict-ref division-i varname-i) "static") do-assign-st-i do-assign-dy-i))
+
+;     ; static-ASSIGN
+;     (do-assign-st-i (fc-assign vs-i (dict-set vs-i varname-i (fc-eval-with-state expr-i vs-i)))
+;                     (fc-goto in-loop-i))
+
+;     ; dynamic-ASSIGN
+;     (do-assign-dy-i (fc-assign instr-i (list `(fc-assign ,varname-i ,(fc-reduce expr-i vs-i))))
+;                     (fc-assign code-i  (append code-i instr-i))
+;                     (fc-goto in-loop-i))
+
+;     ; IF: if expr then goto pp' else goto pp''
+;     (do-if-i (fc-assign expr-i (cadr command-i))
+;              (fc-if (equal? (fc-expr-static? expr-i division-i) #t) do-if-st-i do-if-dy-i))
+
+;     ; static-IF
+;     (do-if-st-i (fc-assign st-cond-i (fc-eval-with-state expr-i vs-i))
+;                 (fc-if (equal? st-cond-i #t) do-if-st-t-i do-if-st-f-i))
+
+;     ; static-IF-true
+;     (do-if-st-t-i (fc-assign pp1-i (caddr command-i))
+;                   (fc-assign bb-i (lookup-bb pp1-i (cdr program-i)))
+;                   (fc-goto in-loop-i))
+
+;     ; static-IF-false
+;     (do-if-st-f-i (fc-assign pp1-i (cadddr command-i))
+;                   (fc-assign bb-i (lookup-bb pp1-i (cdr program-i)))
+;                   (fc-goto in-loop-i))
+
+;     ; dynamic-IF
+;     (do-if-dy-i   (fc-assign pp1-i     (caddr command-i))
+;                   (fc-assign pp2-i     (cadddr command-i))
+;                   (fc-assign pp1vs-i   (cons pp1-i vs-i))
+;                   (fc-assign pp2vs-i   (cons pp2-i vs-i))
+;                   (fc-assign npend-i   (list-subtract (list pp1vs-i pp2vs-i) marked-i))
+;                   (fc-assign pending-i (append pending-i npend-i))
+;                   (fc-assign label-i   (cons pp-i vs-i))
+;                   (fc-assign instr-i   (list `(fc-if ,(fc-reduce expr-i vs-i) ,pp1vs-i ,pp2vs-i)))
+;                   (fc-assign code-i    (append code-i instr-i))
+;                   (fc-goto in-loop-i))
+
+;     ; GOTO: goto pp'
+;     (do-goto-i (fc-assign pp1-i (cadr command-i))
+;                (fc-assign bb-i (lookup-bb pp1-i (cdr program-i)))
+;                (fc-goto in-loop-i))
+
+;     ; RETURN: return expr
+;     (do-return-i (fc-assign expr-i    (cadr command-i)) ; cdr returns an expression wrapped into a list
+;                  (fc-assign reduced-i  (fc-reduce expr-i vs-i))
+;                  (fc-assign label-i    (cons pp-i vs-i))
+;                  (fc-assign instr-i    (list `(fc-return ,reduced-i)))
+;                  (fc-assign code-i     (append code-i instr-i))
+;                  (fc-goto in-loop-i))
+
+;     ; END CASE
+;     (upd-residual-i (fc-assign residual-i (append residual-i (list code-i)))
+;                     (fc-goto main-loop-i))
+
+;     (stop-i (fc-return residual-i))
+
+;     (errlbl-i (fc-return (format "fc-mix: unknown label")))
+;     )
+;   )
+
+
+(define fc-mix-inner-inner
+  '((fc-read program-i division-i vs0-i)
+
+    (init-i (fc-assign pp0-i      (caadr program-i))
+            (fc-assign pending-i  (list (cons pp0-i vs0-i)))
+            (fc-assign marked-i  '())
+            (fc-assign residual-i (list (filter-read (car program-i) division-i)))
+            (fc-goto main-loop-i))
+
+    (main-loop-i (fc-if (equal? pending-i '()) stop-i iter-i))
+
+    (iter-i (fc-assign pp-i      (caar pending-i))
+            (fc-assign vs-i      (cdar pending-i))
+            (fc-assign pending-i (cdr pending-i))
+            (fc-assign marked-i  (append marked-i (list (cons pp-i vs-i))))
+            (fc-goto trick-begin-i))
+
+    (in-loop-i (fc-if (equal? bb-i '()) upd-residual-i case-cmd-i))
+
+    (case-cmd-i (fc-assign command-i (car bb-i))
+                (fc-assign bb-i (cdr bb-i))
+                (fc-goto if-assign-i))
+
+    (if-assign-i (fc-if (equal? (car command-i) 'fc-assign) do-assign-i if-return-i))
+    (if-return-i (fc-if (equal? (car command-i) 'fc-return) do-return-i if-goto-i))
+    (if-goto-i   (fc-if (equal? (car command-i) 'fc-goto)   do-goto-i   if-if-i))
+    (if-if-i     (fc-if (equal? (car command-i) 'fc-if)     do-if-i     errlbl-i))
+
+    ; BEGIN CASE
+
+    ; ASSIGN: varname := expr
+    (do-assign-i (fc-if (equal? (dict-ref division-i (cadr command-i)) "static")
+                        do-assign-st-i
+                        do-assign-dy-i))
+
+    ; static-ASSIGN
+    (do-assign-st-i (fc-assign vs-i (dict-set vs-i (cadr command-i) (fc-eval-with-state (caddr command-i) vs-i)))
+                    (fc-goto in-loop-i))
+
+    ; dynamic-ASSIGN
+    (do-assign-dy-i (fc-assign code-i (append code-i (list `(fc-assign ,(cadr command-i) ,(fc-reduce (caddr command-i) vs-i)))))
+                    (fc-goto in-loop-i))
+
+    ; IF: if expr then goto pp' else goto pp''
+    (do-if-i (fc-if (equal? (fc-expr-static? (cadr command-i) division-i) #t) do-if-st-i do-if-dy-i))
+
+    ; static-IF
+    (do-if-st-i (fc-if (equal? (fc-eval-with-state (cadr command-i) vs-i) #t) do-if-st-t-i do-if-st-f-i))
+
+    ; static-IF-true
+    (do-if-st-t-i (fc-assign bb-i (lookup-bb (caddr command-i) (cdr program-i)))
+                  (fc-goto in-loop-i))
+
+    ; static-IF-false
+    (do-if-st-f-i (fc-assign bb-i (lookup-bb (cadddr command-i) (cdr program-i)))
+                  (fc-goto in-loop-i))
+
+    ; dynamic-IF
+    (do-if-dy-i (fc-assign pending-i (append pending-i (list-subtract (list (cons (caddr command-i) vs-i) (cons (cadddr command-i) vs-i)) marked-i)))
+                (fc-assign code-i    (append code-i
+                                             (list `(fc-if ,(fc-reduce (cadr command-i) vs-i)
+                                                           ,(cons (caddr command-i) vs-i)
+                                                           ,(cons (cadddr command-i) vs-i)))))
+                (fc-goto in-loop-i))
+
+    ; GOTO: goto pp'
+    (do-goto-i (fc-assign bb-i (lookup-bb (cadr command-i) (cdr program-i)))
+               (fc-goto in-loop-i))
+
+    ; RETURN: return expr
+    (do-return-i (fc-assign code-i (append code-i (list `(fc-return ,(fc-reduce (cadr command-i) vs-i)))))
+                 (fc-goto in-loop-i))
+
+    ; END CASE
+    (upd-residual-i (fc-assign residual-i (append residual-i (list code-i)))
+                    (fc-goto main-loop-i))
+
+    (stop-i (fc-return residual-i))
+
+    ; THE TRICK
+    ; pp-dynamic is pp
+    (trick-begin-i (fc-assign labels-i (append (list pp0-i) (get-dynamic-labels program-i division-i)))
+                   (fc-goto trick-cycle-i))
+
+    (trick-cycle-i (fc-if (equal? labels-i '()) trick-error-label-i trick-iter-i))
+
+    (trick-iter-i  (fc-assign pp-static-i (car labels-i))
+                   (fc-assign labels-i (cdr labels-i))
+                   (fc-if (equal? pp-i pp-static-i) trick-found-pp-i trick-cycle-i))
+
+    (trick-found-pp-i (fc-assign bb-i (lookup-bb pp-static-i (cdr program-i)))
+                      (fc-assign code-i (list (cons pp-static-i vs-i)))
+                      (fc-goto in-loop-i))
+
+    (trick-error-label-i (fc-return (format "trick in fc-mix: unknown label")))
+
+    (errlbl-i (fc-return (format "fc-mix: unknown label")))
     )
   )

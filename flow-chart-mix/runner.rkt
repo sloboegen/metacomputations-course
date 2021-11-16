@@ -6,7 +6,9 @@
 (require "tm-int.rkt")
 
 
-; ====PROGRAMS WITH DIVISIONS====
+; =======================================================================
+; ======================== PROGRAMS AND DIVISIONS =======================
+; =======================================================================
 
 ; Find-name
 (define find-name
@@ -18,7 +20,11 @@
     (found (fc-return (car valuelist)))
     ))
 
-(define find-name-division #hash((name . "static") (namelist . "static") (valuelist . "dynamic")))
+(define find-name-division #hash((name      . "static")
+                                 (namelist  . "static")
+                                 (valuelist . "dynamic"))
+  )
+
 (define find-name-vs  #hash((name . z) (namelist . (x y z))))
 
 (define (find-name-mix) (fc-int fc-mix `(,find-name ,find-name-division ,find-name-vs)))
@@ -44,7 +50,10 @@
 
 (define tm-int-vs       `#hash((Q          . ,tm-example)))
 
-; ====FIRST FUTAMURA PROJECTION====
+; =======================================================================
+; ======================== I FUTAMURA PROJECTION ========================
+; =======================================================================
+
 ; Testing all mix-implementations
 ; simple
 (define (tm-int-example-mix-simple) (fc-int fc-mix `(,tm-int ,tm-int-division ,tm-int-vs)))
@@ -58,7 +67,13 @@
 (define (tm-int-example-mix-trick) (fc-int fc-mix-trick `(,tm-int ,tm-int-division ,tm-int-vs)))
 (define (tm-int-example-mix-trick-pp) (pretty-labels-program (tm-int-example-mix-trick)))
 
-; ====SECOND FUTAMURA PROJECTION====
+; inner-inner mix (for 3d projection)
+(define (tm-int-example-mix-inner-inner) (fc-int fc-mix-inner-inner `(,tm-int ,tm-int-division ,tm-int-vs)))
+(define (tm-int-example-mix-inner-inner-pp) (pretty-labels-program (tm-int-example-mix-inner-inner)))
+
+; =======================================================================
+; ======================== II FUTAMURA PROJECTION =======================
+; =======================================================================
 
 ; inner mix (with the trick) division
 (define fc-mix-division #hash((program   . "static")
@@ -77,49 +92,90 @@
                               (command   . "static"))
   )
 
-; 1. TM-interpreter
+; ------------------------ 1. TM-interpreter ----------------------------
 
 ; vs for TM-interpreter
 (define fc-mix-tm-vs `#hash((program  . ,tm-int)
                             (division . ,tm-int-division))
   )
 
-; fc-mix-mix-pp is a generated compiler for TM program
+; self-application, compiler for TM
 (define (fc-mix-mix-tm) (fc-int fc-mix-outer `(,fc-mix-trick ,fc-mix-division ,fc-mix-tm-vs)))
 
+; compiler for TM with pretty labels
 (define (fc-mix-mix-tm-pp) (pretty-labels-program (fc-mix-mix-tm)))
 
+; check correctness of generated compiler
 (define (fc-mix-mix-tm-example-vs) `#hash((vs0 . ,tm-int-vs)))
-
-; check correctness
 (define (test-generate-compiler-TM) (fc-int (fc-mix-mix-tm-pp) `(,tm-int-vs)))
 
+; ------------------------ 2. Flow Chart-interpreter --------------------
 
-; 2. FlowChart-interpreter
-(define fc-fc-int-division #hash((pgm-fc   . "static")
+(define fc-fc-int-division #hash((pgm-fc   . "static" )
                                  (data     . "dynamic")
                                  (vrbs     . "dynamic")
                                  (vals     . "dynamic")
-                                 (inst     . "static")
-                                 (bb-rest  . "static")
-                                 (var      . "static")
-                                 (expr     . "static")
+                                 (inst     . "static" )
+                                 (bb-rest  . "static" )
+                                 (var      . "static" )
+                                 (expr     . "static" )
                                  (vrbsvals . "dynamic")
-                                 (lbl      . "static")
-                                 (lbl-t    . "static")
-                                 (lbl-f    . "static"))
+                                 (lbl      . "static" )
+                                 (lbl-t    . "static" )
+                                 (lbl-f    . "static" ))
   )
 
 (define fc-mix-vs-fc-int `#hash((program  . ,fc-fc-int)
                                 (division . ,fc-fc-int-division))
   )
 
+; self-application, compiler for Flow Chart
 (define (fc-mix-mix-fc) (fc-int fc-mix-outer `(,fc-mix-trick ,fc-mix-division ,fc-mix-vs-fc-int)))
 
+; compiler for Flow Chart with pretty labels
 (define (fc-mix-mix-fc-pp) (pretty-labels-program (fc-mix-mix-fc)))
 
+; check correctness of generated compiler
 (define fc-int-vs `#hash((pgm-fc . ,find-name)))
 
 (define (test-generate-compiler-fc) (fc-int (fc-mix-mix-fc-pp) `(,fc-int-vs)))
 
 (define (test-fc-compiler-test-pp) (pretty-labels-program (test-generate-compiler-fc)))
+
+
+; =======================================================================
+; ======================== III FUTAMURA PROJECTION ======================
+; =======================================================================
+
+
+
+; III projection: mix1 (mix2 (mix3))
+; * mix1 is `fc-mix-outer` from fc-mix.rkt
+; * mix2 is `fc-mix-trick` from fc-mix.rkt
+; * mix3 is `fc-mix-inner-inner` from fc-mix.rkt
+
+(define fc-mix-inner-inner-division #hash((program-i   . "static")
+                                          (division-i  . "static")
+                                          (vs0-i       . "dynamic")
+                                          (pp0-i       . "static")
+                                          (pending-i   . "dynamic")
+                                          (marked-i    . "dynamic")
+                                          (residual-i  . "dynamic")
+                                          (pp-i        . "dynamic")
+                                          (vs-i        . "dynamic")
+                                          (labels-i    . "static")
+                                          (pp-static-i . "static")
+                                          (bb-i        . "static")
+                                          (code-i      . "dynamic")
+                                          (command-i   . "static"))
+  )
+
+(define fc-mix-vs-fc-mix `#hash((program  . ,fc-mix-inner-inner)
+                                (division . ,fc-mix-inner-inner-division))
+  )
+
+; compiler generator
+(define (fc-mix-mix-mix) (fc-int fc-mix-outer `(,fc-mix-trick ,fc-mix-division ,fc-mix-vs-fc-mix)))
+
+; compiler generator with pretty labels
+(define (fc-mix-mix-mix-pp) (pretty-labels-program (fc-mix-mix-mix)))
